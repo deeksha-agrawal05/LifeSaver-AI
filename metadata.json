@@ -1,0 +1,6 @@
+{
+  "name": "LifeSaver AI",
+  "description": "An AI-powered productivity companion that helps you complete tasks before deadlines are missed, featuring AI subtask generation and intelligent prioritization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

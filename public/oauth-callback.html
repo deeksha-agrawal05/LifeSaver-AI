@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Google Calendar Connection</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      text-align: center;
+      max-width: 400px;
+    }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #4f46e5;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1.5rem;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    h2 { color: #1e293b; margin-top: 0; }
+    p { color: #64748b; font-size: 0.875rem; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2>Connecting Google Calendar</h2>
+    <p>Please wait while we complete your connection to LifeSaver AI...</p>
+  </div>
+  <script>
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.substring(1));
+    const token = params.get('access_token');
+    
+    if (token) {
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'GOOGLE_OAUTH_SUCCESS',
+          accessToken: token
+        }, window.location.origin);
+        window.close();
+      } else {
+        document.querySelector('.card').innerHTML = `
+          <h2 style="color: #ef4444;">Error</h2>
+          <p>No opener window detected. Please try opening the connection again.</p>
+        `;
+      }
+    } else {
+      document.querySelector('.card').innerHTML = `
+        <h2 style="color: #ef4444;">Connection Failed</h2>
+        <p>Google did not return an access token. Please close this window and try again.</p>
+      `;
+    }
+  </script>
+</body>
+</html>
