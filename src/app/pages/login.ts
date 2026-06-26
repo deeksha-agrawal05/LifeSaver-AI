@@ -128,9 +128,9 @@ export class Login {
   showPassword = signal<boolean>(false);
 
   authForm: FormGroup = this.fb.group({
-    email: ['deeksha895474@gmail.com', [Validators.required, Validators.email]],
-    password: ['password123', [Validators.required, Validators.minLength(6)]],
-    name: ['Deeksha', [Validators.required]]
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', [Validators.required, Validators.minLength(6)]],
+    name: ['', [Validators.required]]
   });
 
   onAuthSubmit() {
