@@ -124,8 +124,8 @@ export class TaskManager {
   enterGuestMode() {
     const guestUser: User = {
       id: 'guest_user',
-      email: 'guest@lifesaver.ai',
-      name: 'Guest'
+      email: 'deeksha895474@gmail.com',
+      name: 'Deeksha'
     };
 
     this.currentUser.set(guestUser);
