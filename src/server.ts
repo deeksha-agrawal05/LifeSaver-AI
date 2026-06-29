@@ -38,18 +38,74 @@ function getGeminiClient(): GoogleGenAI {
 }
 
 /**
+ * Robust server-side Gemini error handler that identifies 503/UNAVAILABLE errors
+ * and forwards them to the client with the correct HTTP 503 status code.
+ */
+function handleServerError(error: unknown, res: express.Response, context: string) {
+  const errMsg = error instanceof Error ? error.message : 'Unknown error';
+  console.error(`Error in ${context}:`, error);
+
+  const errObj = error as Record<string, unknown> | null;
+  
+  // Try to find the nested error object if present
+  const nestedError = (errObj && typeof errObj['error'] === 'object') ? (errObj['error'] as Record<string, unknown>) : null;
+  
+  const isUnavailable = !!(errObj && (
+    errObj['status'] === 'UNAVAILABLE' ||
+    errObj['status'] === 503 ||
+    errObj['statusCode'] === 503 ||
+    errObj['code'] === 503 ||
+    errObj['code'] === '503' ||
+    (typeof errObj['message'] === 'string' && (
+      errObj['message'].includes('UNAVAILABLE') ||
+      errObj['message'].includes('503') ||
+      errObj['message'].includes('experiencing high demand') ||
+      errObj['message'].includes('high demand')
+    )) ||
+    (nestedError && (
+      nestedError['status'] === 'UNAVAILABLE' ||
+      nestedError['status'] === 503 ||
+      nestedError['statusCode'] === 503 ||
+      nestedError['code'] === 503 ||
+      nestedError['code'] === '503' ||
+      (typeof nestedError['message'] === 'string' && (
+        nestedError['message'].includes('UNAVAILABLE') ||
+        nestedError['message'].includes('503') ||
+        nestedError['message'].includes('experiencing high demand') ||
+        nestedError['message'].includes('high demand')
+      ))
+    ))
+  ));
+
+  if (isUnavailable) {
+    return res.status(503).json({
+      error: 'The AI model is currently unavailable or experiencing high demand.',
+      message: errMsg,
+      details: error
+    });
+  }
+
+  return res.status(500).json({
+    error: 'Internal server error processing AI request.',
+    message: errMsg,
+    details: error
+  });
+}
+
+/**
  * AI API Endpoints
  */
 
 // Generate subtasks and priority planner using Gemini
 app.post('/api/ai/subtasks', async (req, res) => {
   try {
-    const { title, description, deadline, urgency, calendarEvents } = req.body;
+    const { title, description, deadline, urgency, calendarEvents, model } = req.body;
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
     }
 
     const ai = getGeminiClient();
+    const activeModel = model || "gemini-3.5-flash";
     const currentTime = new Date().toISOString();
     const calendarContext = calendarEvents && calendarEvents.length > 0 
       ? `Upcoming calendar events during this period: ${JSON.stringify(calendarEvents)}. Please ensure proposed subtasks account for these events and do not suggest working during busy calendar events.`
@@ -73,7 +129,7 @@ Your job is to:
 4. Formulate a concise, highly motivating, and professional recommendation reason (1-2 sentences) explaining the urgency/score and encouraging action.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: activeModel,
       contents: prompt,
       config: {
         systemInstruction: "You are LifeSaver AI, a highly intelligent, encouraging, and objective productivity companion.",
@@ -121,21 +177,20 @@ Your job is to:
     const plannerData = JSON.parse(text.trim());
     return res.json(plannerData);
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in /api/ai/subtasks:', error);
-    return res.status(500).json({ error: errMsg });
+    return handleServerError(error, res, '/api/ai/subtasks');
   }
 });
 
 // Calculate intelligent workload priorities
 app.post('/api/ai/prioritize', async (req, res) => {
   try {
-    const { tasks, calendarEvents } = req.body;
+    const { tasks, calendarEvents, model } = req.body;
     if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
       return res.json({ recommendations: [] });
     }
 
     const ai = getGeminiClient();
+    const activeModel = model || "gemini-3.5-flash";
     const currentTime = new Date().toISOString();
     const calendarContext = calendarEvents && calendarEvents.length > 0
       ? `Upcoming calendar events during this period: ${JSON.stringify(calendarEvents)}. If a task deadline falls near or during these busy calendar events, its priority should be increased because the user has less free/available time to execute the task subtasks.`
@@ -170,7 +225,7 @@ Also provide a supportive, clear, human-friendly "recommendationReason" explaini
 Return an array matching the schema.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: activeModel,
       contents: prompt,
       config: {
         systemInstruction: "You are LifeSaver AI, an objective, motivating productivity scheduler. Be direct but extremely helpful, prioritizing task safety.",
@@ -207,21 +262,20 @@ Return an array matching the schema.`;
     const recommendations = JSON.parse(text.trim());
     return res.json({ recommendations });
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in /api/ai/prioritize:', error);
-    return res.status(500).json({ error: errMsg });
+    return handleServerError(error, res, '/api/ai/prioritize');
   }
 });
 
 // Rescue Mode Endpoint
 app.post('/api/ai/rescue', async (req, res) => {
   try {
-    const { taskTitle, taskDescription, deadline, urgency, subtasks, currentTime, calendarEvents } = req.body;
+    const { taskTitle, taskDescription, deadline, urgency, subtasks, currentTime, calendarEvents, model } = req.body;
     if (!taskTitle) {
       return res.status(400).json({ error: 'Task Title is required' });
     }
 
     const ai = getGeminiClient();
+    const activeModel = model || "gemini-3.5-flash";
     const referenceTime = currentTime || new Date().toISOString();
     const calendarContext = calendarEvents && calendarEvents.length > 0
       ? `CRITICAL CALENDAR CONTEXT (Upcoming commitments before the deadline):
@@ -253,7 +307,7 @@ Your job is to:
 6. Provide a concise recommendation explanation (1-2 sentences).`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: activeModel,
       contents: prompt,
       config: {
         systemInstruction: "You are LifeSaver AI, an emergency task-salvation advisor. You deliver clear, encouraging, hyper-practical advice and triage options.",
@@ -301,21 +355,20 @@ Your job is to:
     const rescuePlanData = JSON.parse(text.trim());
     return res.json(rescuePlanData);
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in /api/ai/rescue:', error);
-    return res.status(500).json({ error: errMsg });
+    return handleServerError(error, res, '/api/ai/rescue');
   }
 });
 
 // Accountability Agent Daily Audit Endpoint
 app.post('/api/ai/accountability', async (req, res) => {
   try {
-    const { tasks, userFeedback, currentTime } = req.body;
+    const { tasks, userFeedback, currentTime, model } = req.body;
     if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
       return res.status(400).json({ error: 'Active tasks are required for audit' });
     }
 
     const ai = getGeminiClient();
+    const activeModel = model || "gemini-3.5-flash";
     const referenceTime = currentTime || new Date().toISOString();
 
     const prompt = `You are LifeSaver AI's dedicated Accountability Agent.
@@ -352,7 +405,7 @@ Perform an audit based on this feedback:
 Return the response conforming exactly to the responseSchema.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: activeModel,
       contents: prompt,
       config: {
         systemInstruction: "You are LifeSaver AI's Accountability Agent. You are firm, extremely supportive, empathetic, and expert at breaking down procrastination with low-friction micro-actions.",
@@ -394,9 +447,7 @@ Return the response conforming exactly to the responseSchema.`;
     const accountabilityData = JSON.parse(text.trim());
     return res.json(accountabilityData);
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in /api/ai/accountability:', error);
-    return res.status(500).json({ error: errMsg });
+    return handleServerError(error, res, '/api/ai/accountability');
   }
 });
 

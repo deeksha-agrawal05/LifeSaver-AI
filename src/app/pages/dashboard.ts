@@ -12,8 +12,14 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
     <!-- Top Action Bar -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-5 border-b border-slate-200">
       <div>
-        <h2 class="font-display font-bold text-2xl text-slate-900">Workspace Command Center</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Welcome back, {{ taskManager.currentUser()?.name || 'Deeksha' }}. Optimize your cognitive priorities.</p>
+        <h2 class="font-display font-bold text-2xl text-slate-900">Dashboard</h2>
+        <p class="text-xs text-slate-500 mt-0.5">
+          @if (taskManager.currentUser()?.name) {
+            Welcome back, {{ taskManager.currentUser()?.name }}! Manage your tasks effectively.
+          } @else {
+            Welcome back! Manage your tasks effectively.
+          }
+        </p>
       </div>
       
       <div class="flex flex-wrap items-center gap-3">
@@ -21,9 +27,10 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
         <button (click)="runPrioritization()"
                 [disabled]="taskManager.loadingPrioritization() || taskManager.tasks().length === 0"
                 class="px-4 py-2.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50"
-                id="btn-re-prioritize">
+                id="btn-re-prioritize"
+                title="Let AI analyze and sort your tasks by priority">
           <span class="material-icons text-sm" [class.animate-spin]="taskManager.loadingPrioritization()">auto_awesome</span>
-          <span>{{ taskManager.loadingPrioritization() ? 'Prioritizing...' : 'Re-Prioritize Workload' }}</span>
+          <span>{{ taskManager.loadingPrioritization() ? 'Sorting Tasks...' : 'Auto-Sort Tasks (AI)' }}</span>
         </button>
 
         <!-- Create Task Link -->
@@ -31,7 +38,7 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
            class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm"
            id="btn-new-task">
           <span class="material-icons text-sm">add</span>
-          <span>Create LifeSaver Task</span>
+          <span>Add New Task</span>
         </a>
       </div>
     </div>
@@ -103,6 +110,27 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
       </div>
     </section>
 
+    <!-- ONBOARDING CARD FOR NEW USERS -->
+    @if (taskManager.tasks().length === 0) {
+      <div class="mb-8 p-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-3xl shadow-xs" id="onboarding-card">
+        <div class="flex flex-col md:flex-row items-center gap-6">
+          <div class="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-md shrink-0">
+            <span class="material-icons text-3xl">task</span>
+          </div>
+          <div class="flex-grow text-center md:text-left space-y-1">
+            <h3 class="font-display font-bold text-sm text-slate-950">Welcome to your AI Task Manager!</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              This is your main dashboard. To get started, click <strong>Add New Task</strong> above to add your first item to the list, or connect your calendar to see real-time conflicts.
+            </p>
+          </div>
+          <a routerLink="/create-task" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 hover:shadow-md text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shrink-0 cursor-pointer">
+            <span class="material-icons text-sm">add</span>
+            <span>Add Your First Task</span>
+          </a>
+        </div>
+      </div>
+    }
+
     <!-- ACCOUNTABILITY AGENT MINI-BANNER -->
     @if (hasActiveTasks()) {
       <div class="mb-8 p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-3xl border border-indigo-800/20 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
@@ -112,15 +140,15 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
           </div>
           <div class="space-y-1">
             <h4 class="font-display font-bold text-sm text-white tracking-wide flex items-center gap-1.5">
-              Accountability Coach Check-in Available
+              AI Coach: Review Your Progress
               @if (taskManager.stats().looming > 0) {
                 <span class="bg-red-500 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm animate-pulse">
-                  Urgent alerts
+                  Urgent
                 </span>
               }
             </h4>
             <p class="text-xs text-indigo-200 leading-relaxed max-w-2xl">
-              Keep momentum high. Check overdue tasks, log status, select roadblocks, and let Gemini construct a custom plan with low-friction, 15-minute start steps.
+              Get an AI-guided check-in. Review your tasks, identify roadblocks, and let the AI build a step-by-step plan to help you get started.
             </p>
           </div>
         </div>
@@ -128,8 +156,8 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
         <a routerLink="/accountability"
            class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:scale-[1.02] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer"
            id="dash-start-checkin">
-          <span class="material-icons text-sm">bolt</span>
-          <span>Start Accountability Check-In</span>
+          <span class="material-icons text-sm">psychology</span>
+          <span>Start AI Review</span>
         </a>
       </div>
     }
@@ -144,11 +172,11 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
         
         <div class="relative z-10 flex items-center justify-between pb-4 border-b border-white/10">
           <div class="flex items-center gap-2">
-            <span class="material-icons text-indigo-300">psychology</span>
-            <h3 class="font-display font-bold text-sm uppercase tracking-wider">Focus Widget: AI Recommended Task</h3>
+            <span class="material-icons text-indigo-300">auto_awesome</span>
+            <h3 class="font-display font-bold text-sm uppercase tracking-wider">Top Priority Task</h3>
           </div>
           <span class="bg-indigo-500 text-white text-[9px] px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-sm">
-            Top Recommendation
+            AI Recommended
           </span>
         </div>
 
@@ -196,7 +224,7 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
 
             <!-- Focus Actions side-panel -->
             <div class="bg-indigo-950/40 border border-white/5 rounded-2xl p-5 space-y-4 text-center">
-              <span class="text-[10px] uppercase font-bold text-indigo-300 tracking-wider block">Workload progress</span>
+              <span class="text-[10px] uppercase font-bold text-indigo-300 tracking-wider block">Task Progress</span>
               
               <!-- Progress bar -->
               <div class="space-y-1">
@@ -211,8 +239,8 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
 
               <button [routerLink]="['/task-details', taskManager.recommendedTask()?.id]"
                       class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all">
-                <span class="material-icons text-sm">bolt</span>
-                <span>Activate Focus Console</span>
+                <span class="material-icons text-sm">visibility</span>
+                <span>Open Task Details</span>
               </button>
             </div>
 
@@ -221,9 +249,9 @@ import { CalendarService, CalendarEvent } from '../services/calendar';
           <!-- Empty focus advisor state -->
           <div class="text-center py-8 relative z-10 space-y-2">
             <span class="material-icons text-emerald-400 text-4xl">verified</span>
-            <h4 class="text-sm font-semibold text-white">All Clear! No Pending Focus Threats</h4>
+            <h4 class="text-sm font-semibold text-white">All Clear! No Pending Priority Tasks</h4>
             <p class="text-xs text-indigo-200 max-w-md mx-auto">
-              Your active queue is completely clear or all requirements are resolved. Dynamic Gemini prioritizer will load recommendations as soon as new deadline parameters are scheduled!
+              You have no active tasks that require immediate attention. When you add tasks, the AI will recommend which one to start first here.
             </p>
           </div>
         }

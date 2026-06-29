@@ -117,14 +117,14 @@ import { TaskManager } from '../services/task-manager';
           <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
             <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider text-red-500">Workspace Database Controls</h3>
             <p class="text-xs text-slate-500 leading-relaxed">
-              To support rapid prototype sandboxing, you can reset all active records back to the default curated LifeSaver demo set or clear all local database caches to start fresh.
+              To support rapid prototype sandboxing, you can load a set of curated LifeSaver onboarding tasks or clear all local database caches to start fresh.
             </p>
             
             <div class="flex flex-wrap gap-3 pt-2">
               <button (click)="resetDemoData()" 
                       class="px-4 py-2 border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors">
-                <span class="material-icons text-sm">restore</span>
-                <span>Restore Default Demo Dataset</span>
+                <span class="material-icons text-sm">rocket_launch</span>
+                <span>Load Sample Onboarding Tasks</span>
               </button>
 
               <button (click)="clearAllTasks()" 
@@ -169,7 +169,7 @@ export class Profile {
   }
 
   resetDemoData() {
-    if (confirm('Restore workspace back to initial curated demo items? Your current temporary items will be overwritten.')) {
+    if (confirm('Load sample onboarding tasks? Your current temporary items will be overwritten.')) {
       const user = this.taskManager.currentUser();
       if (user) {
         const demo = this.taskManager.getDemoTasks(user.id);

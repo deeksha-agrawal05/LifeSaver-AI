@@ -175,10 +175,10 @@ export class Login {
               <p class="text-sm text-slate-500 mt-1">to continue to LifeSaver AI</p>
               
               <div class="mt-6 p-4 border border-slate-200 bg-white rounded-xl w-full max-w-sm flex items-center gap-3 text-left">
-                <div class="w-10 h-10 bg-indigo-100 text-indigo-700 flex items-center justify-center rounded-full font-bold">D</div>
+                <div class="w-10 h-10 bg-indigo-100 text-indigo-700 flex items-center justify-center rounded-full font-bold">G</div>
                 <div>
-                  <p class="text-sm font-semibold text-slate-800">Deeksha</p>
-                  <p class="text-xs text-slate-500">deeksha895474@gmail.com</p>
+                  <p class="text-sm font-semibold text-slate-800">Google User</p>
+                  <p class="text-xs text-slate-500">google.user&#64;example.com</p>
                 </div>
               </div>
             </div>
@@ -196,13 +196,13 @@ export class Login {
       const timer = setInterval(() => {
         if (simulatedPopup.closed) {
           clearInterval(timer);
-          this.taskManager.login('deeksha895474@gmail.com', 'Deeksha');
+          this.taskManager.login('google.user@example.com', 'Google User');
           this.router.navigate(['/dashboard']);
         }
       }, 500);
     } else {
       // Direct login if popup is blocked
-      this.taskManager.login('deeksha895474@gmail.com', 'Deeksha');
+      this.taskManager.login('google.user@example.com', 'Google User');
       this.router.navigate(['/dashboard']);
     }
   }

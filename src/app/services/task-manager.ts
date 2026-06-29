@@ -1,11 +1,43 @@
 import { Injectable, computed, signal, inject } from '@angular/core';
 import { CalendarService } from './calendar';
+import { AIService } from './ai';
 
 export interface Subtask {
   id: string;
   title: string;
   completed: boolean;
   estimatedMinutes: number;
+}
+
+export interface AISubtasksResponse {
+  subtasks?: { title: string; estimatedMinutes?: number }[];
+  priorityScore?: number;
+  recommendationReason?: string;
+}
+
+export interface AIPrioritizeResponse {
+  recommendations: { taskId: string; priorityScore: number; recommendationReason: string }[];
+}
+
+export interface AIRescueResponse {
+  emergencyPlan?: string;
+  probabilityOfMissing?: number;
+  recommendationReason?: string;
+  reorderedSubtasks?: Subtask[];
+}
+
+export interface TaskUpdateProposal {
+  taskId: string;
+  updatedPriorityScore: number;
+  updatedUrgency: 'low' | 'medium' | 'high' | 'critical';
+  suggestedNextAction: string;
+  actionEstMinutes: number;
+  recommendationReason: string;
+}
+
+export interface AuditResponse {
+  generalAssessment: string;
+  taskUpdates: TaskUpdateProposal[];
 }
 
 export interface RescuePlan {
@@ -43,6 +75,7 @@ export interface User {
 })
 export class TaskManager {
   private calendarService = inject(CalendarService);
+  aiService = inject(AIService);
 
   // Core State Signals
   currentUser = signal<User | null>(null);
@@ -88,10 +121,6 @@ export class TaskManager {
         } catch {
           this.tasks.set([]);
         }
-      } else if (userId === 'guest_user') {
-        const demo = this.getDemoTasks(userId);
-        this.tasks.set(demo);
-        this.saveTasksToStorage(userId, demo);
       } else {
         this.tasks.set([]);
       }
@@ -124,8 +153,8 @@ export class TaskManager {
   enterGuestMode() {
     const guestUser: User = {
       id: 'guest_user',
-      email: 'guest@lifesaver.ai',
-      name: 'Guest'
+      email: 'guest@example.com',
+      name: 'Guest User'
     };
 
     this.currentUser.set(guestUser);
@@ -345,26 +374,14 @@ export class TaskManager {
     this.aiError.set(null);
 
     try {
-      const response = await fetch('/api/ai/subtasks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: task.title,
-          description: task.description,
-          deadline: task.deadline,
-          urgency: task.urgency,
-          calendarEvents: this.calendarService.events()
-        }),
+      const data = await this.aiService.callApiWithRetryAndFallback<AISubtasksResponse>('/api/ai/subtasks', {
+        title: task.title,
+        description: task.description,
+        deadline: task.deadline,
+        urgency: task.urgency,
+        calendarEvents: this.calendarService.events()
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Server error generating subtasks');
-      }
-
-      const data = await response.json();
       const generated: { title: string; estimatedMinutes?: number }[] = data.subtasks || [];
       const priorityScore = typeof data.priorityScore === 'number' ? data.priorityScore : this.calculateDefaultPriority(task.urgency, task.deadline);
       const recommendationReason = data.recommendationReason || 'Structured with Gemini AI.';
@@ -437,27 +454,25 @@ export class TaskManager {
     this.aiError.set(null);
 
     try {
-      const response = await fetch('/api/ai/prioritize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tasks: this.tasks(),
-          calendarEvents: this.calendarService.events()
-        }),
+      const data = await this.aiService.callApiWithRetryAndFallback<AIPrioritizeResponse>('/api/ai/prioritize', {
+        tasks: this.tasks(),
+        calendarEvents: this.calendarService.events()
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Server error calculating priorities');
+      console.log('Gemini API Response (Prioritize):', data);
+
+      const recommendations = Array.isArray(data) ? data : (data && typeof data === 'object' ? (data as any).recommendations : null);
+
+      if (!recommendations || !Array.isArray(recommendations)) {
+        console.error('Invalid or missing recommendations in Gemini response. Raw response:', data);
+        throw new Error('Invalid Gemini response');
       }
 
-      const data = await response.json();
-      const recommendations: { taskId: string; priorityScore: number; recommendationReason: string }[] = data.recommendations;
-
       const updatedTasks = this.tasks().map(t => {
-        const rec = recommendations.find((r: { taskId: string }) => r.taskId === t.id);
+        const rec = (recommendations && Array.isArray(recommendations)) 
+          ? recommendations.find((r: { taskId: string }) => r.taskId === t.id)
+          : null;
+
         if (rec) {
           return {
             ...t,
@@ -482,8 +497,7 @@ export class TaskManager {
 
     } catch (err: unknown) {
       console.error(err);
-      const errMsg = err instanceof Error ? err.message : 'API call failed.';
-      this.aiError.set(errMsg + ' Generating smart local workload ordering.');
+      this.aiError.set(err instanceof Error ? err.message : 'Unable to prioritize tasks right now. Please try again in a moment.');
 
       const now = new Date().getTime();
       const updatedTasks = this.tasks().map(t => {
@@ -536,28 +550,15 @@ export class TaskManager {
     this.aiError.set(null);
 
     try {
-      const response = await fetch('/api/ai/rescue', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          taskTitle: task.title,
-          taskDescription: task.description,
-          deadline: task.deadline,
-          urgency: task.urgency,
-          subtasks: task.subtasks,
-          currentTime: new Date().toISOString(),
-          calendarEvents: this.calendarService.getBusyEventsInWindow(task.deadline)
-        }),
+      const data = await this.aiService.callApiWithRetryAndFallback<AIRescueResponse>('/api/ai/rescue', {
+        taskTitle: task.title,
+        taskDescription: task.description,
+        deadline: task.deadline,
+        urgency: task.urgency,
+        subtasks: task.subtasks,
+        currentTime: new Date().toISOString(),
+        calendarEvents: this.calendarService.getBusyEventsInWindow(task.deadline)
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Server error generating rescue plan');
-      }
-
-      const data = await response.json();
       
       const emergencyPlan = data.emergencyPlan || 'No tactical plan returned from Gemini.';
       const probabilityOfMissing = typeof data.probabilityOfMissing === 'number' ? data.probabilityOfMissing : 50;
@@ -646,7 +647,7 @@ The local scheduler calculated your available time vs. efforts to optimize progr
     }
   }
 
-  async runAccountabilityAudit(userFeedback: { taskId: string; progressComment: string; blockerSelected: string }[]) {
+  async runAccountabilityAudit(userFeedback: { taskId: string; progressComment: string; blockerSelected: string }[]): Promise<AuditResponse | null> {
     const user = this.currentUser();
     if (!user) return null;
 
@@ -654,24 +655,11 @@ The local scheduler calculated your available time vs. efforts to optimize progr
     this.aiError.set(null);
 
     try {
-      const response = await fetch('/api/ai/accountability', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tasks: this.tasks().filter(t => t.status !== 'completed'),
-          userFeedback,
-          currentTime: new Date().toISOString()
-        }),
+      return await this.aiService.callApiWithRetryAndFallback<AuditResponse>('/api/ai/accountability', {
+        tasks: this.tasks().filter(t => t.status !== 'completed'),
+        userFeedback,
+        currentTime: new Date().toISOString()
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Server error generating accountability audit');
-      }
-
-      return await response.json();
     } catch (err: unknown) {
       console.error(err);
       const errMsg = err instanceof Error ? err.message : 'API key missing or configuration error.';
@@ -692,6 +680,11 @@ The local scheduler calculated your available time vs. efforts to optimize progr
   }[]) {
     const user = this.currentUser();
     if (!user) return;
+
+    if (!updates || !Array.isArray(updates)) {
+      console.error('Invalid or missing accountability updates. Raw updates:', updates);
+      return;
+    }
 
     const updatedTasks = this.tasks().map(t => {
       const update = updates.find(u => u.taskId === t.id);
@@ -820,62 +813,40 @@ The local scheduler calculated your available time vs. efforts to optimize progr
 
   getDemoTasks(userId: string): Task[] {
     const now = new Date();
-    const d1 = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-    const d2 = new Date(now.getTime() + 18 * 60 * 60 * 1000);
-    const d3 = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const d1 = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours
+    const d2 = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 1 day
 
     return [
       {
-        id: 'task_demo_1',
+        id: 'task_onboarding_1',
         userId,
-        title: 'Complete final research proposal',
-        description: 'Compile literature reviews, format references, and prepare the executive slide summary for the team review.',
+        title: 'Explore LifeSaver Focus Console & AI features',
+        description: 'Click on this task from the dashboard, then try triggering the "AI Subtask breakdown" or "AI Rescue Plan" to optimize your time management.',
         deadline: d1.toISOString(),
-        urgency: 'critical',
-        status: 'in_progress',
-        progress: 33,
-        subtasks: [
-          { id: 'sub_d1_1', title: 'Verify references & citations', completed: true, estimatedMinutes: 20 },
-          { id: 'sub_d1_2', title: 'Draft methodology description', completed: false, estimatedMinutes: 45 },
-          { id: 'sub_d1_3', title: 'Format and export final PDF proposal', completed: false, estimatedMinutes: 15 }
-        ],
-        priorityScore: 92,
-        aiRecommendationReason: 'CRITICAL ALERT: Due in less than 4 hours! Only 1 of 3 subtasks is completed. Immediate focus is strongly advised.',
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString()
-      },
-      {
-        id: 'task_demo_2',
-        userId,
-        title: 'Review team development blocker',
-        description: 'Check cloud server configurations and resolve connection timeout issues on the staging environment.',
-        deadline: d2.toISOString(),
         urgency: 'high',
-        status: 'pending',
+        status: 'in_progress',
         progress: 0,
         subtasks: [
-          { id: 'sub_d2_1', title: 'Inspect docker deployment logs', completed: false, estimatedMinutes: 30 },
-          { id: 'sub_d2_2', title: 'Test local connection timeout settings', completed: false, estimatedMinutes: 15 }
+          { id: 'sub_on_1', title: 'Check out subtasks list', completed: false, estimatedMinutes: 5 },
+          { id: 'sub_on_2', title: 'Generate an AI rescue plan', completed: false, estimatedMinutes: 10 }
         ],
-        priorityScore: 78,
-        aiRecommendationReason: 'HIGH PRIORITY: Due tomorrow morning. Ensure logs are inspected today to avoid blocking developer work.',
+        priorityScore: 85,
+        aiRecommendationReason: 'Get started here! Learn how LifeSaver uses Gemini to protect your focus from procrastination.',
         createdAt: now.toISOString(),
         updatedAt: now.toISOString()
       },
       {
-        id: 'task_demo_3',
+        id: 'task_onboarding_2',
         userId,
-        title: 'Weekly grocery prep & budget audit',
-        description: 'Review bank statement expenses, plan meals, and log pending credit records.',
-        deadline: d3.toISOString(),
+        title: 'Schedule a custom personal milestone',
+        description: 'Use the "Create LifeSaver Task" button to add a task with a deadline and description.',
+        deadline: d2.toISOString(),
         urgency: 'medium',
-        status: 'completed',
-        progress: 100,
-        subtasks: [
-          { id: 'sub_d3_1', title: 'Calculate total meal expenses', completed: true, estimatedMinutes: 10 }
-        ],
-        priorityScore: 0,
-        aiRecommendationReason: 'Task is already safely completed! Great job.',
+        status: 'pending',
+        progress: 0,
+        subtasks: [],
+        priorityScore: 50,
+        aiRecommendationReason: 'Add a real deadline to see dynamic priority calculation and timeline mapping in action.',
         createdAt: now.toISOString(),
         updatedAt: now.toISOString()
       }

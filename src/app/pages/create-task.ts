@@ -27,8 +27,8 @@ import { TaskManager } from '../services/task-manager';
             <span class="material-icons">add_task</span>
           </div>
           <div>
-            <h2 class="font-display font-bold text-xl text-slate-900">New LifeSaver Task</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Setup a deadline goal to get customized Gemini AI micro-steps.</p>
+            <h2 class="font-display font-bold text-xl text-slate-900">New Task</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Add a task and let AI break it down into manageable steps.</p>
           </div>
         </div>
 
@@ -46,7 +46,7 @@ import { TaskManager } from '../services/task-manager';
           <!-- Description Input -->
           <div>
             <label for="task-desc" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Description</label>
-            <textarea id="task-desc" formControlName="description" rows="4" placeholder="Add relevant details, links, or context to help Gemini structure the ultimate step-by-step roadmap for you..."
+            <textarea id="task-desc" formControlName="description" rows="4" placeholder="Add details or context to help the AI create a step-by-step plan..."
                       class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-slate-50/30"></textarea>
           </div>
 
@@ -64,13 +64,13 @@ import { TaskManager } from '../services/task-manager';
 
             <!-- Urgency level -->
             <div>
-              <label for="task-urgency" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Urgency Threat</label>
+              <label for="task-urgency" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Priority Level</label>
               <select id="task-urgency" formControlName="urgency"
                       class="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer">
                 <option value="low">Low Priority</option>
                 <option value="medium">Medium Priority</option>
                 <option value="high">High Priority</option>
-                <option value="critical">🔴 Critical Blockers</option>
+                <option value="critical">🔴 Critical</option>
               </select>
             </div>
           </div>
@@ -80,8 +80,8 @@ import { TaskManager } from '../services/task-manager';
             <input type="checkbox" formControlName="generateAI" id="chk-generate-ai"
                    class="mt-1 h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer" />
             <label for="chk-generate-ai" class="text-xs text-slate-700 leading-relaxed cursor-pointer">
-              <strong>Generate Subtasks with Gemini AI</strong><br />
-              Decompose your stress. Generates 3 to 5 realistic micro-milestones automatically using Google's cognitive assistant.
+              <strong>Break down task with AI</strong><br />
+              Automatically generate 3 to 5 manageable subtasks.
             </label>
           </div>
 
